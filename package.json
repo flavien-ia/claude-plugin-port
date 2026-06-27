@@ -1,0 +1,37 @@
+{
+  "name": "claude-plugin-to-codex",
+  "version": "0.1.0",
+  "description": "Convert a Claude Code plugin into a native OpenAI Codex plugin: manifest translation, marketplace registration, and ${CLAUDE_SKILL_DIR} anchor rewriting. Plugin-level, not just skill-copying.",
+  "type": "module",
+  "bin": {
+    "claude-plugin-to-codex": "bin/claude-plugin-to-codex.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "openai-codex",
+    "plugin",
+    "skills",
+    "agent-skills",
+    "SKILL.md",
+    "AGENTS.md",
+    "converter",
+    "migration"
+  ],
+  "license": "MIT",
+  "author": "Flavien Chervet",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flavien-ia/claude-plugin-to-codex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/flavien-ia/claude-plugin-to-codex/issues"
+  },
+  "homepage": "https://github.com/flavien-ia/claude-plugin-to-codex#readme"
+}
