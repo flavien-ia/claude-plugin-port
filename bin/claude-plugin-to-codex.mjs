@@ -105,6 +105,7 @@ const shortDesc = desc.length > 120 ? desc.slice(0, 117) + "..." : desc;
 let defaultPrompt = defaultPromptArg.length
   ? defaultPromptArg
   : (srcManifest.interface?.defaultPrompt || srcManifest.defaultPrompt || [`Use the ${displayName} plugin`]);
+if (!Array.isArray(defaultPrompt)) defaultPrompt = [defaultPrompt];
 defaultPrompt = defaultPrompt.slice(0, 3).map((s) => String(s).slice(0, 128));
 const license = detectLicense();
 const hasMcp = fs.existsSync(path.join(source, ".mcp.json"));
@@ -157,13 +158,23 @@ function normalizeFrontmatter(text) {
   return lines.join(eol);
 }
 
-function transformMd(text, skillAbsDirFwd) {
+// Rewrite the Claude plugin path anchors to absolute install paths. Safe to run
+// on any text file: there is NO CLAUDE.md->AGENTS.md rename here, so scripts that
+// legitimately reference ~/.claude/CLAUDE.md are left untouched.
+function rewriteTokens(text, skillAbsDirFwd) {
   let t = text;
   t = t.split("${CLAUDE_SKILL_DIR}/../../").join(installDirFwd + "/");
   if (skillAbsDirFwd) {
     t = t.split("${CLAUDE_SKILL_DIR}/").join(skillAbsDirFwd + "/");
     t = t.split("${CLAUDE_SKILL_DIR}").join(skillAbsDirFwd);
   }
+  // ${CLAUDE_PLUGIN_ROOT} is the canonical plugin-root anchor = the install dir.
+  t = t.split("${CLAUDE_PLUGIN_ROOT}/").join(installDirFwd + "/");
+  t = t.split("${CLAUDE_PLUGIN_ROOT}").join(installDirFwd);
+  return t;
+}
+function transformMd(text, skillAbsDirFwd) {
+  let t = rewriteTokens(text, skillAbsDirFwd);
   t = t.split("CLAUDE.md").join("AGENTS.md");
   t = t.replace(/^[ \t]*user-invocable:.*$\r?\n?/gm, "");
   t = normalizeFrontmatter(t);
@@ -183,16 +194,25 @@ function skillDirFor(absFile) {
   if (rel[0] === "skills" && rel.length >= 2) return fwd(path.join(installDir, "skills", rel[1]));
   return null;
 }
+// Non-.md text files that may contain ${CLAUDE_*} path tokens get token
+// rewriting only (no CLAUDE.md rename, no frontmatter pass). Everything else is
+// copied verbatim so binary assets are never corrupted.
+const TOKEN_TEXT_EXT = new Set([".sh", ".bash", ".mjs", ".cjs", ".js", ".ts", ".mts", ".cts", ".txt", ".yaml", ".yml", ".toml", ".json"]);
 let mdCount = 0, fileCount = 0;
 function walkCopy(srcDir, dstDir, doTransform) {
   for (const ent of fs.readdirSync(srcDir, { withFileTypes: true })) {
     const sp = path.join(srcDir, ent.name), dp = path.join(dstDir, ent.name);
     if (ent.isDirectory()) { mkdir(dp); walkCopy(sp, dp, doTransform); }
     else if (ent.isFile()) {
-      if (doTransform && ent.name.endsWith(".md")) {
+      const ext = path.extname(ent.name).toLowerCase();
+      if (doTransform && ext === ".md") {
         const out = transformMd(fs.readFileSync(sp, "utf8"), skillDirFor(dp));
         scanResidual(fwd(path.relative(installDir, dp)), out);
         writeFile(dp, out); mdCount++;
+      } else if (doTransform && TOKEN_TEXT_EXT.has(ext)) {
+        const out = rewriteTokens(fs.readFileSync(sp, "utf8"), skillDirFor(dp));
+        scanResidual(fwd(path.relative(installDir, dp)), out);
+        writeFile(dp, out); fileCount++;
       } else { copyFile(sp, dp); fileCount++; }
     }
   }

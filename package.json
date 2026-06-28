@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-to-codex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert a Claude Code plugin into a native OpenAI Codex plugin: manifest translation, marketplace registration, and ${CLAUDE_SKILL_DIR} anchor rewriting. Plugin-level, not just skill-copying.",
   "type": "module",
   "bin": {
