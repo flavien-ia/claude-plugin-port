@@ -12,7 +12,8 @@ npx claude-plugin-to-codex --source ./my-plugin
 # OpenCode: installs under ~/.config/opencode/skills/<name> and generates the plugin
 # that runs the guardrail hooks and carries the MCP servers and permission rules
 npx claude-plugin-to-codex --source ./my-plugin --target opencode
-npx claude-plugin-to-opencode --source ./my-plugin          # same thing, target preset
+npx claude-plugin-to-opencode --source ./my-plugin          # same converter, published under
+                                                            # its OpenCode name (alias package)
 
 # Portable bundle: a folder that installs by being unzipped in one known place
 npx claude-plugin-to-codex --source ./my-plugin --target opencode --bundle ./out
