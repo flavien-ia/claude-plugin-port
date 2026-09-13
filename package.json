@@ -1,14 +1,19 @@
 {
   "name": "claude-plugin-to-codex",
-  "version": "0.1.1",
-  "description": "Convert a Claude Code plugin into a native OpenAI Codex plugin: manifest translation, marketplace registration, and ${CLAUDE_SKILL_DIR} anchor rewriting. Plugin-level, not just skill-copying.",
+  "version": "0.2.0",
+  "description": "Port a Claude Code plugin to OpenAI Codex or to OpenCode: manifest translation, skills with rewritten path anchors, PreToolUse hooks carried over (natively on Codex, through a generated plugin on OpenCode), MCP servers, rules files. Plugin-level, not just skill-copying.",
   "type": "module",
   "bin": {
-    "claude-plugin-to-codex": "bin/claude-plugin-to-codex.mjs"
+    "claude-plugin-to-codex": "bin/claude-plugin-to-codex.mjs",
+    "claude-plugin-to-opencode": "bin/claude-plugin-to-opencode.mjs"
   },
   "files": [
-    "bin"
+    "bin",
+    "lib"
   ],
+  "scripts": {
+    "test": "node --test test/converter.test.mjs"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -16,11 +21,13 @@
     "claude-code",
     "codex",
     "openai-codex",
+    "opencode",
     "plugin",
     "skills",
     "agent-skills",
     "SKILL.md",
     "AGENTS.md",
+    "hooks",
     "converter",
     "migration"
   ],

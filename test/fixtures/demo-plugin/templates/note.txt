@@ -1,0 +1,1 @@
+A template. Mentions CLAUDE.md and ${CLAUDE_PLUGIN_ROOT} on purpose: templates are project payload and stay verbatim.

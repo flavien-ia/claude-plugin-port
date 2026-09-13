@@ -1,0 +1,7 @@
+{
+  "name": "demo-plugin",
+  "version": "1.2.3",
+  "description": "Demo: a tiny plugin used by the converter's tests.",
+  "author": { "name": "Test Author" },
+  "license": "MIT"
+}

@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "context7": { "type": "http", "url": "https://mcp.context7.com/mcp" },
+    "local-tool": { "command": "npx", "args": ["-y", "some-mcp"], "env": { "TOKEN": "x" } }
+  }
+}

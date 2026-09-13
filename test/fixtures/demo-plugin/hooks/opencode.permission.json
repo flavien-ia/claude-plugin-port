@@ -1,0 +1,9 @@
+{
+  "$comment": "Mirror of the ask rules in hooks/guard.mjs, for OpenCode's native permission prompts.",
+  "permission": {
+    "bash": {
+      "git push*": "ask",
+      "git push*--dry-run*": "allow"
+    }
+  }
+}
