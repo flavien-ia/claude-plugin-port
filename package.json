@@ -1,7 +1,7 @@
 {
   "name": "claude-plugin-to-codex",
-  "version": "0.2.0",
-  "description": "Port a Claude Code plugin to OpenAI Codex or to OpenCode: manifest translation, skills with rewritten path anchors, PreToolUse hooks carried over (natively on Codex, through a generated plugin on OpenCode), MCP servers, rules files. Plugin-level, not just skill-copying.",
+  "version": "0.3.0",
+  "description": "Port a Claude Code plugin to OpenAI Codex or to OpenCode: manifest translation, skills with rewritten path anchors, PreToolUse hooks carried over (natively on Codex, through a generated plugin on OpenCode), MCP servers, rules files. Installs locally, or builds portable bundles that install by unzipping. Plugin-level, not just skill-copying.",
   "type": "module",
   "bin": {
     "claude-plugin-to-codex": "bin/claude-plugin-to-codex.mjs",
@@ -40,5 +40,26 @@
   "bugs": {
     "url": "https://github.com/flavien-ia/claude-plugin-to-codex/issues"
   },
-  "homepage": "https://github.com/flavien-ia/claude-plugin-to-codex#readme"
+  "homepage": "https://github.com/flavien-ia/claude-plugin-to-codex#readme",
+  "main": "./lib/convert.mjs",
+  "exports": {
+    ".": {
+      "types": "./lib/convert.d.ts",
+      "default": "./lib/convert.mjs"
+    },
+    "./convert": {
+      "types": "./lib/convert.d.ts",
+      "default": "./lib/convert.mjs"
+    },
+    "./bundle": {
+      "types": "./lib/bundle.d.ts",
+      "default": "./lib/bundle.mjs"
+    },
+    "./guard": {
+      "types": "./lib/guard.d.ts",
+      "default": "./lib/guard.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/convert.d.ts"
 }

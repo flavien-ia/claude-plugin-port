@@ -9,10 +9,13 @@ A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`
 # marketplace, validates it, installs it with `codex plugin add`
 npx claude-plugin-to-codex --source ./my-plugin
 
-# OpenCode: installs under ~/.config/opencode/skills/<name>, generates the guard
-# plugin from hooks/hooks.json, merges MCP servers and permission rules into opencode.json
+# OpenCode: installs under ~/.config/opencode/skills/<name> and generates the plugin
+# that runs the guardrail hooks and carries the MCP servers and permission rules
 npx claude-plugin-to-codex --source ./my-plugin --target opencode
 npx claude-plugin-to-opencode --source ./my-plugin          # same thing, target preset
+
+# Portable bundle: a folder that installs by being unzipped in one known place
+npx claude-plugin-to-codex --source ./my-plugin --target opencode --bundle ./out
 
 npx claude-plugin-to-codex --source ./my-plugin --dry-run   # preview, writes nothing
 ```
@@ -23,8 +26,8 @@ Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
 
 | In the plugin | Why | Codex | OpenCode |
 |---|---|---|---|
-| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts | both hosts run skill commands with `cwd` = the user's project and no plugin variable | absolute install path | absolute install path |
-| a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | absolute install path | absolute install path |
+| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts | both hosts run skill commands with `cwd` = the user's project and no plugin variable | install path | install path |
+| a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | install path | install path |
 | `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see below) |
 | frontmatter `user-invocable`, `allowed-tools`, `argument-hint` | Claude Code only | dropped | dropped |
 | unquoted frontmatter scalars with `: ` etc. | strict YAML parsers | quoted | quoted |
@@ -32,7 +35,7 @@ Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
 | the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" |
 | skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence |
 
-`templates/` is project payload and stays byte for byte. `_`-prefixed skill names are kept: both loaders accept them.
+The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte. `_`-prefixed skill names are kept: both loaders accept them.
 
 ## Codex
 
@@ -51,22 +54,25 @@ Flags: `--plugins-dir`, `--marketplace`, `--marketplace-file`, `--category`, `--
 
 Installs under `~/.config/opencode/skills/<name>/` (OpenCode discovers `skills/**/SKILL.md`, so the plugin keeps its own layout: `skills/`, `scripts/`, `templates/`, `hooks/`). Every skill is loaded by the `skill` tool and also answers to `/<skill-name>` as a command, with no wrapper to generate.
 
-### The guard plugin
+### The generated plugin
 
-If the plugin has PreToolUse command hooks in `hooks/hooks.json`, the converter generates `~/.config/opencode/plugins/<name>-guard.js`, an OpenCode plugin whose `tool.execute.before` hook runs **the same hook commands**, fed the same JSON Claude Code feeds them (`tool_name`, `tool_input.command`, `cwd`, ...), with `CLAUDE_PLUGIN_ROOT` set. A `deny` decision (or exit code 2) throws, which blocks the tool call and hands the reason to the model. The plugin author keeps one decision function for every host.
+One file, `~/.config/opencode/plugins/<name>-guard.js`, does the rest when OpenCode starts:
+
+- **Hooks.** Its `tool.execute.before` hook runs **the same PreToolUse hook commands** as Claude Code, fed the same JSON (`tool_name`, `tool_input.command`, `cwd`, ...), with `CLAUDE_PLUGIN_ROOT` set. A `deny` decision (or exit code 2) throws, which blocks the tool call and hands the reason to the model. The plugin author keeps one decision function for every host.
+- **Configuration.** Its `config` hook adds the plugin's MCP servers (from `.mcp.json`) and permission rules (see below) to OpenCode's live configuration, never replacing what the user already wrote. `opencode.json` is left alone; `--write-config` also merges them into the file, for those who want them visible there.
 
 ### Asking the user
 
 OpenCode plugins cannot open a confirmation prompt, so an `ask` decision is handled one of two ways:
 
-- **Permission rules** (recommended). Put a fragment next to your hooks, `hooks/opencode.permission.json`, mirroring your `ask` rules as OpenCode wildcard patterns; the converter merges it into `opencode.json` (or pass any file with `--permissions`). OpenCode then shows its native prompt. Example:
+- **Permission rules** (recommended). Put a fragment next to your hooks, `hooks/opencode.permission.json`, mirroring your `ask` rules as OpenCode wildcard patterns (or pass any file with `--permissions`); the plugin carries it, and OpenCode shows its native prompt. Example:
 
   ```json
   { "permission": { "bash": { "git push*": "ask", "git push*--dry-run*": "allow" } } }
   ```
 
-  OpenCode applies the **last matching rule**, so order your patterns from general to specific. Rules the user already wrote for a pattern are never overwritten; a plain `"bash": "allow"` is widened to `{"*": "allow", ...}` first.
-- **Soft mode** (`--ask-mode soft`, the default when no fragment is merged). The guard blocks the call once with the hook's reason and asks the model to get the user's explicit agreement, then lets the identical command through on its next attempt in the same session. It is a nudge, not a gate: prefer permission rules for anything that matters.
+  OpenCode applies the **last matching rule**, so order your patterns from general to specific. A rule the user already wrote for a pattern is never overwritten; a plain `"bash": "allow"` is widened to `{"*": "allow", ...}` first.
+- **Soft mode** (`--ask-mode soft`, the default when no fragment exists). The plugin blocks the call once with the hook's reason and asks the model to get the user's explicit agreement, then lets the identical command through on its next attempt in the same session. It is a nudge, not a gate: prefer permission rules for anything that matters.
 
 ### Rules file
 
@@ -76,20 +82,39 @@ OpenCode reads `AGENTS.md`, and `CLAUDE.md` as a fallback (project, and `~/.clau
 - `claude`: the port keeps `CLAUDE.md` everywhere, so a machine that also runs Claude Code has one rules file for both tools instead of two that drift. OpenCode reads it as long as no `AGENTS.md` sits next to it.
 - `auto` (default): `claude` when `~/.claude/CLAUDE.md` exists on the machine, `agents` otherwise.
 
-### Config merge
+Flags: `--opencode-dir`, `--out`, `--rules-file`, `--permissions`, `--ask-mode`, `--no-guard`, `--write-config`.
 
-`.mcp.json` servers become `mcp` entries (`type: "remote"` for `http`/`sse`, `type: "local"` for commands), added only when absent. The existing `opencode.json`/`opencode.jsonc` is backed up before any change; a file that carries comments is never rewritten, the additions go to the sibling file instead (OpenCode merges both). `--no-config` skips all of it.
+Uninstall: delete the install dir and the plugin file; nothing else was written.
 
-Flags: `--opencode-dir`, `--out`, `--rules-file`, `--permissions`, `--ask-mode`, `--no-guard`, `--no-config`.
+## Bundles
 
-Uninstall: delete the install dir and the guard plugin file, and remove the `mcp` and `permission` entries the converter listed when it added them.
+`--bundle <dir>` writes a **portable** layout instead of installing: anchors are `$HOME`-relative, and unzipping the folder in one known place installs the plugin, with no command to type.
+
+| Target | Unzip into | Contents |
+|---|---|---|
+| codex | the home folder | `plugins/<name>/` (the plugin) and `.agents/plugins/marketplace.json` (a personal marketplace listing it; keep yours and add the entry if you already have one). Then install it from Codex's plugin browser, or `codex plugin add <name>@personal`. |
+| opencode | `~/.config/opencode` | `skills/<name>/` (the plugin) and `plugins/<name>-guard.js` (hooks, MCP servers and permission rules, root resolved from the home folder when it loads). Start a new session. |
+
+Bundles use `AGENTS.md` and `--ask-mode pass` when a permission fragment exists.
+
+## As a library
+
+```js
+import { convertFiles, describeSource } from "claude-plugin-to-codex/convert";
+import { buildBundle } from "claude-plugin-to-codex/bundle";
+
+// files: [{ path: "skills/x/SKILL.md", content: "..." }, ...], plugin-root-relative
+const { files, warnings } = buildBundle(files, { target: "opencode", generator: "my-site" });
+// zip `files` yourself (JSZip, archiver...). Binary contents pass through untouched.
+```
+
+No disk, no environment lookups: a web server can convert an archive on download.
 
 ## Limitations
 
 - Skills that spell out Claude Code specifics beyond what is rewritten (settings files, slash-command menus) keep saying them; read the port once.
 - Hooks other than PreToolUse are carried to Codex (which runs them) but not to OpenCode.
 - OpenCode's permission patterns are wildcards on the parsed command, less precise than a hook's regexes: the fragment mirrors, the hook decides.
-- The build bakes absolute paths for your machine, so it is produced locally and is not a committable artifact.
 - Both hosts move fast. Tested with Codex CLI 0.154 and OpenCode 1.18.30.
 
 ## Development
