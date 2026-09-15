@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-to-codex",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Port a Claude Code plugin to OpenAI Codex or to OpenCode: manifest translation, skills with rewritten path anchors, PreToolUse hooks carried over (natively on Codex, through a generated plugin on OpenCode), MCP servers, rules files. Installs locally, or builds portable bundles that install by unzipping. Plugin-level, not just skill-copying.",
   "type": "module",
   "bin": {

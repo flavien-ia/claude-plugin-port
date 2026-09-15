@@ -1,0 +1,2 @@
+Project notes written by the plugin.
+Ask the `_internal` skill for the format, or run /hello again.

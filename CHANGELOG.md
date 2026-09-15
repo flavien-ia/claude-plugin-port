@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 - 2026-09-15
+
+- Skill names: a name outside lowercase letters, digits and single hyphens is renamed to what Codex's skill validator and OpenCode ask for. A leading `_` becomes the internal prefix (`<plugin name>-` by default, `--internal-prefix` to choose), and every mention of the skill follows: folder, `name:` line, paths, `plugin:skill` references, commands, templates and scripts, matched as whole names only. A rename that would collide with another skill stops the conversion. `--keep-skill-names` keeps the names as they are.
+- Frontmatter: a ported `SKILL.md` keeps only `name`, `description`, `license` and `metadata`, the keys Codex's skill validator accepts. `compatibility` goes with the Claude Code keys: it describes Claude Code, and rebranding it produced "Codex or Codex". Any unexpected key is dropped with a warning.
+- Anchors: the bare forms `$CLAUDE_SKILL_DIR` and `$CLAUDE_PLUGIN_ROOT` are rewritten like the braced ones, and reported when left over.
+- `ports.json` at the plugin root states what every port needs: `internalPrefix`, `exclude` (one list, or lists keyed by target) and `keepSkillNames`. It does not ship in the port. On the command line, `--exclude-skill` adds to its list and `--ports` points to another file; in the API, `excludeSkills` and `ports` do the same. Mentions of an excluded skill left in other files are reported.
+- Host variants: `SKILL.codex.md` or `SKILL.opencode.md` next to a `SKILL.md` replaces it in that host's port (any `<file>.<host>.md` in a skill folder), and no variant file ships.
+- Bundles carry `.claude-plugin-to-codex.install.mjs`, a standalone installer that updates the plugin from an unpacked newer bundle: backup outside the folders the host scans, swap with rollback, Codex marketplace entry kept in step with the other entries untouched, `codex plugin add` to refresh Codex's cache, OpenCode's generated plugin replaced along with the skills.
+- The marker file records `renamedSkills` and `excludedSkills` (and `installer` in bundles); `convertFiles()` and `buildBundle()` return them with `skillCount`.
+
 ## 0.3.0 - 2026-09-13
 
 - Portable bundles (`--bundle <dir>`, and `buildBundle()` for servers): the converted plugin laid out so that unzipping it in one known folder installs it. Anchors are written as `$HOME/<path>`, which bash and PowerShell both expand. Codex: unzip in the home folder (`plugins/<name>/` + `.agents/plugins/marketplace.json`). OpenCode: unzip in `~/.config/opencode` (`skills/<name>/` + `plugins/<name>-guard.js`).

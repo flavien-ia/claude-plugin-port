@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-to-opencode",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Port a Claude Code plugin to OpenCode. Alias of claude-plugin-to-codex with the OpenCode target preset: same converter, same repository.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "bin.mjs"
   ],
   "dependencies": {
-    "claude-plugin-to-codex": "^0.3.0"
+    "claude-plugin-to-codex": "^0.4.0"
   },
   "engines": {
     "node": ">=18"

@@ -27,16 +27,44 @@ Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
 
 | In the plugin | Why | Codex | OpenCode |
 |---|---|---|---|
-| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts | both hosts run skill commands with `cwd` = the user's project and no plugin variable | install path | install path |
+| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts, braced or bare (`$CLAUDE_SKILL_DIR`) | both hosts run skill commands with `cwd` = the user's project and no plugin variable | install path | install path |
 | a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | install path | install path |
 | `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see below) |
-| frontmatter `user-invocable`, `allowed-tools`, `argument-hint` | Claude Code only | dropped | dropped |
+| frontmatter keys other than `name`, `description`, `license`, `metadata` (`user-invocable`, `allowed-tools`, `argument-hint`, `compatibility`...) | Codex's skill validator accepts only those, and `compatibility` describes Claude Code | dropped | dropped |
+| skill names outside lowercase letters, digits and single hyphens (typically `_helper`) | the naming rule of both hosts | renamed, every mention rewritten | renamed, every mention rewritten |
 | unquoted frontmatter scalars with `: ` etc. | strict YAML parsers | quoted | quoted |
 | `AskUserQuestion` | a Claude Code tool | "a direct question to the user" | "the `question` tool" |
 | the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" |
 | skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence |
 
-The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte. `_`-prefixed skill names are kept: both loaders accept them.
+The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills.
+
+### Skill names
+
+Codex's skill validator and OpenCode's documentation both ask for names made of lowercase letters, digits and single hyphens. A leading `_`, the usual mark of an internal helper in a Claude Code plugin, becomes the internal prefix, `<plugin name>-` by default: `_helper` becomes `my-plugin-helper`. The folder, the `name:` line and every mention of the skill follow (paths, `plugin:skill` references, `/commands`, templates, scripts), matched as whole names only, so `_helper` is never rewritten inside `_helper-extra`. A rename that would collide with another skill stops the conversion.
+
+`--internal-prefix hv` gives `hv-helper`. `--keep-skill-names` keeps the names as they are: both loaders accept them today, only the validators refuse them.
+
+## The plugin's own settings: `ports.json`
+
+A plugin can state once what each of its ports needs, in a `ports.json` at its root. Claude Code ignores the file, and it does not ship in the port.
+
+```json
+{
+  "internalPrefix": "hv-",
+  "exclude": { "opencode": ["add-routine", "_create-routine"] }
+}
+```
+
+- `internalPrefix`: what a leading `_` becomes (see above).
+- `exclude`: skills left out of the port, as one list for every target or as lists keyed by target. For a skill built on something the host does not have. Mentions of it left in other skills are reported, so their wording can say what to do when the skill is absent.
+- `keepSkillNames`: `true` keeps the original names.
+
+Command-line flags win over the file: `--internal-prefix`, `--keep-skill-names`, `--exclude-skill <name>` (added to the file's list, repeatable) and `--ports <file>` (another settings file).
+
+### A text per host
+
+When a skill works differently on one host, give it a variant next to its `SKILL.md`: `SKILL.codex.md` replaces `SKILL.md` in the Codex port, `SKILL.opencode.md` in the OpenCode port. Any `<file>.codex.md` or `<file>.opencode.md` inside a skill folder works the same way. The variant goes through the same rewrites, and no variant file ships in any port. Claude Code reads `SKILL.md` only.
 
 ## Codex
 
@@ -98,6 +126,17 @@ Uninstall: delete the install dir and the plugin file; nothing else was written.
 
 Bundles use `AGENTS.md` and `--ask-mode pass` when a permission fragment exists.
 
+### Updating from a newer bundle
+
+Every bundle carries a standalone installer at the root of its plugin folder, `.claude-plugin-to-codex.install.mjs`, so a converted plugin can update itself from inside the host with nothing but Node. Unpack the newer bundle anywhere, then run the installer it contains:
+
+```bash
+node <unpacked>/plugins/<name>/.claude-plugin-to-codex.install.mjs --from <unpacked>    # Codex
+node <unpacked>/skills/<name>/.claude-plugin-to-codex.install.mjs --from <unpacked>     # OpenCode
+```
+
+It moves the installed copy to `~/.claude-plugin-to-codex/backups/` (outside the folders the host scans, so the old skills are never loaded twice; the last three are kept), puts the new copy in its place, and brings the old one back if any step fails. On Codex it keeps the plugin's entry in `~/.agents/plugins/marketplace.json` without touching the other entries, then runs `codex plugin add <name>@<marketplace>` so Codex's cache follows (`--no-refresh` to skip). On OpenCode it replaces the generated plugin along with the skills. It prints one JSON line; start a new thread or session afterwards. A plugin's own update command can do the same: download the bundle, unpack it, run the installer.
+
 ## As a library
 
 ```js
@@ -105,15 +144,16 @@ import { convertFiles, describeSource } from "claude-plugin-to-codex/convert";
 import { buildBundle } from "claude-plugin-to-codex/bundle";
 
 // files: [{ path: "skills/x/SKILL.md", content: "..." }, ...], plugin-root-relative
-const { files, warnings } = buildBundle(files, { target: "opencode", generator: "my-site" });
+const { files, warnings, renamedSkills, excludedSkills } = buildBundle(files, { target: "opencode", generator: "my-site" });
 // zip `files` yourself (JSZip, archiver...). Binary contents pass through untouched.
 ```
 
-No disk, no environment lookups: a web server can convert an archive on download.
+No disk, no environment lookups: a web server can convert an archive on download. `ports.json` is read from the files; the options `internalPrefix`, `keepSkillNames`, `excludeSkills` and `ports` (an object, or `null` to ignore the file) do what the flags do.
 
 ## Limitations
 
-- Skills that spell out Claude Code specifics beyond what is rewritten (settings files, slash-command menus) keep saying them; read the port once.
+- Skills that spell out Claude Code specifics beyond what is rewritten (settings files, slash-command menus) keep saying them; read the port once, and write a host variant where the difference matters.
+- A skill name assembled at run time (`"_" + name`) is not seen by the rename.
 - Hooks other than PreToolUse are carried to Codex (which runs them) but not to OpenCode.
 - OpenCode's permission patterns are wildcards on the parsed command, less precise than a hook's regexes: the fragment mirrors, the hook decides.
 - Both hosts move fast. Tested with Codex CLI 0.154 and OpenCode 1.18.30.
