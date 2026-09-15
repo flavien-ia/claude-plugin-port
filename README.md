@@ -1,27 +1,19 @@
-# claude-plugin-to-codex
+# claude-plugin-port
 
-Port a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin to **OpenAI Codex** or to **OpenCode**, as a plugin, not as a pile of copied skills.
-
-A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`, and often `scripts/`, `templates/`, `hooks/` and `.mcp.json`. Codex and OpenCode both read the same `SKILL.md` format, but neither knows Claude Code's path anchors, its rules file, its tool names or its hook wiring. This tool rewrites exactly those, and nothing else.
+The engine that ports a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin to another host, as a plugin, not as a pile of copied skills. It has one command per host, published on its own:
 
 ```bash
-# Codex (default target): builds ~/plugins/<name>, registers it in your personal
-# marketplace, validates it, installs it with `codex plugin add`
-npx claude-plugin-to-codex --source ./my-plugin
-
-# OpenCode: installs under ~/.config/opencode/skills/<name> and generates the plugin
-# that runs the guardrail hooks and carries the MCP servers and permission rules
-npx claude-plugin-to-codex --source ./my-plugin --target opencode
-npx claude-plugin-to-opencode --source ./my-plugin          # same converter, published under
-                                                            # its OpenCode name (alias package)
-
-# Portable bundle: a folder that installs by being unzipped in one known place
-npx claude-plugin-to-codex --source ./my-plugin --target opencode --bundle ./out
-
-npx claude-plugin-to-codex --source ./my-plugin --dry-run   # preview, writes nothing
+npx claude-plugin-to-codex --source ./my-plugin       # OpenAI Codex
+npx claude-plugin-to-opencode --source ./my-plugin    # OpenCode
 ```
 
-Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
+Each command speaks its host only: its help, its flags, its README ([Codex](packages/claude-plugin-to-codex/README.md), [OpenCode](packages/claude-plugin-to-opencode/README.md)). This package is what they share: the conversion, the bundles, the installer, the library API, and a generic command for scripts that serve both hosts:
+
+```bash
+npx claude-plugin-port --source ./my-plugin --target codex|opencode [--bundle <dir>] [--dry-run]
+```
+
+A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`, and often `scripts/`, `templates/`, `hooks/` and `.mcp.json`. Codex and OpenCode both read the same `SKILL.md` format, but neither knows Claude Code's path anchors, its rules file, its tool names or its hook wiring. The engine rewrites exactly those, and nothing else. Idempotent, zero dependencies, Node 18+.
 
 ## What gets rewritten
 
@@ -29,7 +21,7 @@ Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
 |---|---|---|---|
 | `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts, braced or bare (`$CLAUDE_SKILL_DIR`) | both hosts run skill commands with `cwd` = the user's project and no plugin variable | install path | install path |
 | a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | install path | install path |
-| `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see below) |
+| `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see the OpenCode README) |
 | frontmatter keys other than `name`, `description`, `license`, `metadata` (`user-invocable`, `allowed-tools`, `argument-hint`, `compatibility`...) | Codex's skill validator accepts only those, and `compatibility` describes Claude Code | dropped | dropped |
 | skill names outside lowercase letters, digits and single hyphens (typically `_helper`) | the naming rule of both hosts | renamed, every mention rewritten | renamed, every mention rewritten |
 | unquoted frontmatter scalars with `: ` etc. | strict YAML parsers | quoted | quoted |
@@ -37,7 +29,7 @@ Idempotent: re-run it after each plugin update. Zero dependencies, Node 18+.
 | the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" |
 | skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence |
 
-The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills.
+The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills. `hooks/` is carried verbatim: Codex runs `hooks/hooks.json` natively; on OpenCode a generated plugin runs the same PreToolUse hook commands.
 
 ### Skill names
 
@@ -66,55 +58,6 @@ Command-line flags win over the file: `--internal-prefix`, `--keep-skill-names`,
 
 When a skill works differently on one host, give it a variant next to its `SKILL.md`: `SKILL.codex.md` replaces `SKILL.md` in the Codex port, `SKILL.opencode.md` in the OpenCode port. Any `<file>.codex.md` or `<file>.opencode.md` inside a skill folder works the same way. The variant goes through the same rewrites, and no variant file ships in any port. Claude Code reads `SKILL.md` only.
 
-## Codex
-
-Builds `~/plugins/<name>/`:
-
-- `.codex-plugin/plugin.json`: translated manifest with the `interface` block Codex requires; the version gets a `+codex.local-<timestamp>` suffix so a rebuild is seen as an update.
-- `skills/`, `scripts/`, `templates/`, `.mcp.json`: as described above.
-- `hooks/`: **verbatim**. Codex runs a plugin's `hooks/hooks.json` natively, sets `CLAUDE_PLUGIN_ROOT` for the hook commands, and speaks the same stdin/stdout JSON as Claude Code. `permissionDecision: "deny"` blocks the call; `"ask"` is parsed but not supported by Codex yet, so it falls back to Codex's own approval policy. The manifest deliberately carries no `hooks` key: Codex's validator rejects it, and the default location is discovered without it.
-- Registers the plugin in `~/.agents/plugins/marketplace.json` (created if missing), runs the official `validate_plugin.py` when the plugin-creator skill is installed, then `codex plugin add <name>@personal`.
-
-On first use Codex asks you to review and trust each hook (it records the hash). A shell-heavy plugin needs Codex to run with trusted or full access, or the sandbox blocks its commands. Start a new Codex thread after installing.
-
-Flags: `--plugins-dir`, `--marketplace`, `--marketplace-file`, `--category`, `--default-prompt` (repeatable), `--no-validate`, `--no-install`.
-
-## OpenCode
-
-Installs under `~/.config/opencode/skills/<name>/` (OpenCode discovers `skills/**/SKILL.md`, so the plugin keeps its own layout: `skills/`, `scripts/`, `templates/`, `hooks/`). Every skill is loaded by the `skill` tool and also answers to `/<skill-name>` as a command, with no wrapper to generate.
-
-### The generated plugin
-
-One file, `~/.config/opencode/plugins/<name>-guard.js`, does the rest when OpenCode starts:
-
-- **Hooks.** Its `tool.execute.before` hook runs **the same PreToolUse hook commands** as Claude Code, fed the same JSON (`tool_name`, `tool_input.command`, `cwd`, ...), with `CLAUDE_PLUGIN_ROOT` set. A `deny` decision (or exit code 2) throws, which blocks the tool call and hands the reason to the model. The plugin author keeps one decision function for every host.
-- **Configuration.** Its `config` hook adds the plugin's MCP servers (from `.mcp.json`) and permission rules (see below) to OpenCode's live configuration, never replacing what the user already wrote. `opencode.json` is left alone; `--write-config` also merges them into the file, for those who want them visible there.
-
-### Asking the user
-
-OpenCode plugins cannot open a confirmation prompt, so an `ask` decision is handled one of two ways:
-
-- **Permission rules** (recommended). Put a fragment next to your hooks, `hooks/opencode.permission.json`, mirroring your `ask` rules as OpenCode wildcard patterns (or pass any file with `--permissions`); the plugin carries it, and OpenCode shows its native prompt. Example:
-
-  ```json
-  { "permission": { "bash": { "git push*": "ask", "git push*--dry-run*": "allow" } } }
-  ```
-
-  OpenCode applies the **last matching rule**, so order your patterns from general to specific. A rule the user already wrote for a pattern is never overwritten; a plain `"bash": "allow"` is widened to `{"*": "allow", ...}` first.
-- **Soft mode** (`--ask-mode soft`, the default when no fragment exists). The plugin blocks the call once with the hook's reason and asks the model to get the user's explicit agreement, then lets the identical command through on its next attempt in the same session. It is a nudge, not a gate: prefer permission rules for anything that matters.
-
-### Rules file
-
-OpenCode reads `AGENTS.md`, and `CLAUDE.md` as a fallback (project, and `~/.claude/CLAUDE.md` globally). `--rules-file`:
-
-- `agents`: the port writes `AGENTS.md` (project) and `~/.config/opencode/AGENTS.md` (global).
-- `claude`: the port keeps `CLAUDE.md` everywhere, so a machine that also runs Claude Code has one rules file for both tools instead of two that drift. OpenCode reads it as long as no `AGENTS.md` sits next to it.
-- `auto` (default): `claude` when `~/.claude/CLAUDE.md` exists on the machine, `agents` otherwise.
-
-Flags: `--opencode-dir`, `--out`, `--rules-file`, `--permissions`, `--ask-mode`, `--no-guard`, `--write-config`.
-
-Uninstall: delete the install dir and the plugin file; nothing else was written.
-
 ## Bundles
 
 `--bundle <dir>` writes a **portable** layout instead of installing: anchors are `$HOME`-relative, and unzipping the folder in one known place installs the plugin, with no command to type.
@@ -137,18 +80,20 @@ node <unpacked>/skills/<name>/.claude-plugin-to-codex.install.mjs --from <unpack
 
 It moves the installed copy to `~/.claude-plugin-to-codex/backups/` (outside the folders the host scans, so the old skills are never loaded twice; the last three are kept), puts the new copy in its place, and brings the old one back if any step fails. On Codex it keeps the plugin's entry in `~/.agents/plugins/marketplace.json` without touching the other entries, then runs `codex plugin add <name>@<marketplace>` so Codex's cache follows (`--no-refresh` to skip). On OpenCode it replaces the generated plugin along with the skills. It prints one JSON line; start a new thread or session afterwards. A plugin's own update command can do the same: download the bundle, unpack it, run the installer.
 
+The marker each port carries (`.claude-plugin-to-codex.json`, with `target`, `sourceVersion` and `generator`), the installer's file name and the backups folder keep the engine's historical name: installed ports and update flows rely on them.
+
 ## As a library
 
 ```js
-import { convertFiles, describeSource } from "claude-plugin-to-codex/convert";
-import { buildBundle } from "claude-plugin-to-codex/bundle";
+import { convertFiles, describeSource } from "claude-plugin-port/convert";
+import { buildBundle } from "claude-plugin-port/bundle";
 
 // files: [{ path: "skills/x/SKILL.md", content: "..." }, ...], plugin-root-relative
 const { files, warnings, renamedSkills, excludedSkills } = buildBundle(files, { target: "opencode", generator: "my-site" });
 // zip `files` yourself (JSZip, archiver...). Binary contents pass through untouched.
 ```
 
-No disk, no environment lookups: a web server can convert an archive on download. `ports.json` is read from the files; the options `internalPrefix`, `keepSkillNames`, `excludeSkills` and `ports` (an object, or `null` to ignore the file) do what the flags do.
+No disk, no environment lookups: a web server can convert an archive on download. `ports.json` is read from the files; the options `internalPrefix`, `keepSkillNames`, `excludeSkills` and `ports` (an object, or `null` to ignore the file) do what the flags do. `claude-plugin-port/cli` exposes `main(argv, { host, program })`, which the two commands call with their host set.
 
 ## Limitations
 
@@ -163,6 +108,8 @@ No disk, no environment lookups: a web server can convert an archive on download
 ```bash
 node --test test/converter.test.mjs
 ```
+
+The repository holds the engine at its root and the two commands under `packages/`; each command is a few lines that call the engine with its host set. Releases publish the three packages together, the commands pinned to the engine's minor version.
 
 ## License
 

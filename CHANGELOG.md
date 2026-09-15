@@ -2,6 +2,7 @@
 
 ## 0.4.0 - 2026-09-15
 
+- Three packages instead of one: `claude-plugin-port` is the engine (library API, bundles, installer, and a generic `--target` command); `claude-plugin-to-codex` and `claude-plugin-to-opencode` are one command each, bound to their host, with a help and a README that speak that host only. The repository moved to `github.com/flavien-ia/claude-plugin-port` (the old address redirects). The marker (`.claude-plugin-to-codex.json`), the installer file name and the backups folder keep their historical name: installed ports and update flows rely on them.
 - Skill names: a name outside lowercase letters, digits and single hyphens is renamed to what Codex's skill validator and OpenCode ask for. A leading `_` becomes the internal prefix (`<plugin name>-` by default, `--internal-prefix` to choose), and every mention of the skill follows: folder, `name:` line, paths, `plugin:skill` references, commands, templates and scripts, matched as whole names only. A rename that would collide with another skill stops the conversion. `--keep-skill-names` keeps the names as they are.
 - Frontmatter: a ported `SKILL.md` keeps only `name`, `description`, `license` and `metadata`, the keys Codex's skill validator accepts. `compatibility` goes with the Claude Code keys: it describes Claude Code, and rebranding it produced "Codex or Codex". Any unexpected key is dropped with a warning.
 - Anchors: the bare forms `$CLAUDE_SKILL_DIR` and `$CLAUDE_PLUGIN_ROOT` are rewritten like the braced ones, and reported when left over.

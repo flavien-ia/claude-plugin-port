@@ -1,0 +1,42 @@
+{
+  "name": "claude-plugin-to-codex",
+  "version": "0.4.0",
+  "description": "Port a Claude Code plugin to OpenAI Codex, as a plugin: manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks run natively by Codex, MCP servers, rules file. Installs locally with `codex plugin add`, or builds a portable bundle that installs by unzipping. The Codex command of the claude-plugin-port engine.",
+  "type": "module",
+  "bin": {
+    "claude-plugin-to-codex": "bin.mjs"
+  },
+  "files": [
+    "bin.mjs"
+  ],
+  "dependencies": {
+    "claude-plugin-port": "^0.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "openai-codex",
+    "plugin",
+    "skills",
+    "agent-skills",
+    "SKILL.md",
+    "AGENTS.md",
+    "hooks",
+    "converter",
+    "migration"
+  ],
+  "license": "MIT",
+  "author": "Flavien Chervet",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flavien-ia/claude-plugin-port.git",
+    "directory": "packages/claude-plugin-to-codex"
+  },
+  "bugs": {
+    "url": "https://github.com/flavien-ia/claude-plugin-port/issues"
+  },
+  "homepage": "https://github.com/flavien-ia/claude-plugin-port/tree/main/packages/claude-plugin-to-codex#readme"
+}

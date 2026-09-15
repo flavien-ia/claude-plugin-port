@@ -1,11 +1,10 @@
 {
-  "name": "claude-plugin-to-codex",
+  "name": "claude-plugin-port",
   "version": "0.4.0",
-  "description": "Port a Claude Code plugin to OpenAI Codex or to OpenCode: manifest translation, skills with rewritten path anchors, PreToolUse hooks carried over (natively on Codex, through a generated plugin on OpenCode), MCP servers, rules files. Installs locally, or builds portable bundles that install by unzipping. Plugin-level, not just skill-copying.",
+  "description": "The engine behind claude-plugin-to-codex and claude-plugin-to-opencode: ports a Claude Code plugin to OpenAI Codex or to OpenCode (manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks carried over, MCP servers, rules files, portable bundles with a self-contained installer). Library API plus a generic command.",
   "type": "module",
   "bin": {
-    "claude-plugin-to-codex": "bin/claude-plugin-to-codex.mjs",
-    "claude-plugin-to-opencode": "bin/claude-plugin-to-opencode.mjs"
+    "claude-plugin-port": "bin/claude-plugin-port.mjs"
   },
   "files": [
     "bin",
@@ -35,12 +34,12 @@
   "author": "Flavien Chervet",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flavien-ia/claude-plugin-to-codex.git"
+    "url": "git+https://github.com/flavien-ia/claude-plugin-port.git"
   },
   "bugs": {
-    "url": "https://github.com/flavien-ia/claude-plugin-to-codex/issues"
+    "url": "https://github.com/flavien-ia/claude-plugin-port/issues"
   },
-  "homepage": "https://github.com/flavien-ia/claude-plugin-to-codex#readme",
+  "homepage": "https://github.com/flavien-ia/claude-plugin-port#readme",
   "main": "./lib/convert.mjs",
   "exports": {
     ".": {
@@ -58,6 +57,10 @@
     "./guard": {
       "types": "./lib/guard.d.ts",
       "default": "./lib/guard.mjs"
+    },
+    "./cli": {
+      "types": "./lib/cli.d.ts",
+      "default": "./lib/cli.mjs"
     },
     "./package.json": "./package.json"
   },

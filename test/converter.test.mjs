@@ -10,7 +10,8 @@ import { buildBundle, INSTALLER_FILE } from "../lib/bundle.mjs";
 import { rewriteSkillNames } from "../lib/ports.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const BIN = path.join(here, "..", "bin", "claude-plugin-to-codex.mjs");
+const ROOT = path.join(here, "..");
+const BIN = path.join(ROOT, "bin", "claude-plugin-port.mjs");
 const FIXTURE = path.join(here, "fixtures", "demo-plugin");
 const fwd = (p) => p.replace(/\\/g, "/");
 
@@ -145,6 +146,51 @@ test("codex: dry-run writes nothing", () => {
   assert.ok(!fs.existsSync(path.join(t, "demo-plugin")));
   assert.ok(!fs.existsSync(path.join(t, "mk.json")));
   assert.match(out, /DRY-RUN/);
+});
+
+// ------------------------------------------------- one command per host
+
+test("commands: claude-plugin-to-codex and claude-plugin-to-opencode bind their host and refuse the other", () => {
+  // Each command imports the engine by its package name: a junction stands in
+  // for the npm install during the test.
+  const links = [];
+  for (const cmd of ["claude-plugin-to-codex", "claude-plugin-to-opencode"]) {
+    const dir = path.join(ROOT, "packages", cmd, "node_modules");
+    const link = path.join(dir, "claude-plugin-port");
+    fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(link)) fs.symlinkSync(ROOT, link, "junction");
+    links.push(dir);
+  }
+  const runCmd = (cmd, args) => {
+    try {
+      return { code: 0, out: execFileSync(process.execPath, [path.join(ROOT, "packages", cmd, "bin.mjs"), ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) };
+    } catch (e) {
+      return { code: e.status, out: String(e.stdout) + String(e.stderr) };
+    }
+  };
+  try {
+    const codex = runCmd("claude-plugin-to-codex", ["--source", FIXTURE, "--dry-run"]);
+    assert.equal(codex.code, 0, codex.out);
+    assert.match(codex.out, /== target: codex ==/);
+    assert.match(codex.out, /DRY-RUN/);
+    const oc = runCmd("claude-plugin-to-opencode", ["--source", FIXTURE, "--dry-run"]);
+    assert.equal(oc.code, 0, oc.out);
+    assert.match(oc.out, /== target: opencode ==/);
+    const refused = runCmd("claude-plugin-to-codex", ["--source", FIXTURE, "--target", "opencode", "--dry-run"]);
+    assert.equal(refused.code, 1);
+    assert.match(refused.out, /ports to Codex only\. For OpenCode, use npx claude-plugin-to-opencode/);
+    const help = runCmd("claude-plugin-to-codex", ["--help"]).out;
+    assert.match(help, /^claude-plugin-to-codex \d+\.\d+\.\d+ - port a Claude Code plugin to Codex\./m);
+    assert.ok(/^Codex:/m.test(help) && !/^OpenCode:/m.test(help), "the Codex command shows Codex flags only");
+    const helpOc = runCmd("claude-plugin-to-opencode", ["--help"]).out;
+    assert.ok(/^OpenCode:/m.test(helpOc) && !/^Codex:/m.test(helpOc), "the OpenCode command shows OpenCode flags only");
+    const generic = run(["--help"]);
+    assert.match(generic, /^claude-plugin-port \d+\.\d+\.\d+ - port a Claude Code plugin to Codex or OpenCode\./m);
+    const marker = JSON.parse(fs.readFileSync(path.join((() => { const t = tmp(); run(["--source", FIXTURE, "--target", "codex", "--bundle", path.join(t, "b")]); return t; })(), "b", "plugins", "demo-plugin", ".claude-plugin-to-codex.json"), "utf8"));
+    assert.match(marker.generator, /^claude-plugin-port \d+\.\d+\.\d+$/, "the engine signs what it writes");
+  } finally {
+    for (const dir of links) fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ------------------------------------------------------------ ports.json
