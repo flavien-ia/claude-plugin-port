@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Codex check built in: Codex 0.159 stopped shipping the `plugin-creator` skill and its `validate_plugin.py`, so on an up-to-date Codex the validation was silently skipped. The converter now checks the built plugin itself (manifest keys, strict semver, the `interface` block, each skill's frontmatter), and still runs Codex's validator when an older Codex has it, in UTF-8 on Windows.
+- Test: the real-plugin test follows the guard's current wording.
+
 ## 0.4.0 - 2026-09-15
 
 - Three packages instead of one: `claude-plugin-port` is the engine (library API, bundles, installer, and a generic `--target` command); `claude-plugin-to-codex` and `claude-plugin-to-opencode` are one command each, bound to their host, with a help and a README that speak that host only. The repository moved to `github.com/flavien-ia/claude-plugin-port` (the old address redirects). The marker (`.claude-plugin-to-codex.json`), the installer file name and the backups folder keep their historical name: installed ports and update flows rely on them.

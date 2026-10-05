@@ -8,6 +8,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { convertFiles, describeSource, planSkillNames } from "../lib/convert.mjs";
 import { buildBundle, INSTALLER_FILE } from "../lib/bundle.mjs";
 import { rewriteSkillNames } from "../lib/ports.mjs";
+import { checkCodexPlugin, frontmatterFields } from "../lib/targets/codex-check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, "..");
@@ -467,12 +468,41 @@ test("hypervibe (local only): both targets and both bundles build, and the guard
   const hooks = await loadGuard(path.join(cfgDir, "plugins", "hypervibe-guard.js"), "hv");
   const call = (command) => hooks["tool.execute.before"]({ tool: "bash", sessionID: "s", callID: "c" }, { args: { command } });
   await assert.rejects(call("git add -A && git commit -m x"), /^Error: \[Hypervibe\] Sweeping stage refused/, "the hook's own signature is kept, not doubled");
-  await assert.rejects(call("git push --no-verify"), /pre-push recette/);
+  await assert.rejects(call("git push --no-verify"), /pre-push hook/);
   await call("git add src/index.ts");
   for (const target of ["codex", "opencode"]) {
     const out = run(["--source", HYPERVIBE, "--target", target, "--bundle", path.join(t, `bundle-${target}`)]);
     assert.ok(!/residual/.test(out), out);
   }
+  assert.deepEqual(checkCodexPlugin(path.join(t, "hypervibe")), [], "the real plugin passes the Codex check");
   const bundled = read(t, "bundle-codex", "plugins", "hypervibe", "skills", "start", "SKILL.md");
   assert.ok(bundled.includes('PLUGIN_DIR="$HOME/plugins/hypervibe/skills/start/../.."'));
+});
+
+// ------------------------------------------------- the Codex check (no Python)
+
+test("codex check: the demo port passes, and each broken rule is named", () => {
+  const t = tmp();
+  run(["--source", FIXTURE, "--target", "codex", "--plugins-dir", t, "--marketplace-file", path.join(t, "mk.json"), "--no-install"]);
+  const dir = fs.readdirSync(t, { withFileTypes: true }).find((d) => d.isDirectory()).name;
+  const root = path.join(t, dir);
+  assert.deepEqual(checkCodexPlugin(root), []);
+
+  const manifestFile = path.join(root, ".codex-plugin", "plugin.json");
+  const m = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+  fs.writeFileSync(manifestFile, JSON.stringify({ ...m, version: "1.2", hooks: "./hooks.json", interface: { ...m.interface, defaultPrompt: undefined } }));
+  const skill = fs.readdirSync(path.join(root, "skills"))[0];
+  fs.writeFileSync(path.join(root, "skills", skill, "SKILL.md"), "---\nname: x\n---\nNo description.\n");
+  const errors = checkCodexPlugin(root);
+  assert.ok(errors.some((e) => /`hooks` is not accepted/.test(e)), errors.join("\n"));
+  assert.ok(errors.some((e) => /strict semver/.test(e)));
+  assert.ok(errors.some((e) => /defaultPrompt` is required/.test(e)));
+  assert.ok(errors.some((e) => new RegExp(`skill \`${skill}\` frontmatter field \`description\``).test(e)));
+});
+
+test("codex check: frontmatter fields, folded blocks and quotes", () => {
+  assert.deepEqual(frontmatterFields("---\nname: a\ndescription: >-\n  First line\n  second line\n---\nBody").fields, { name: "a", description: "First line second line" });
+  assert.equal(frontmatterFields("---\nname: 'a b'\n---\n").fields.name, "a b");
+  assert.match(frontmatterFields("no frontmatter").error, /must start/);
+  assert.match(frontmatterFields("---\nname: a\n").error, /not closed/);
 });
