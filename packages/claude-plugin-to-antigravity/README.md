@@ -27,7 +27,7 @@ Then quit Antigravity completely and open it again: it discovers a new plugin fo
 - `mcp_config.json`: the plugin's MCP servers (a remote server becomes a `serverUrl` entry). Antigravity names them `<plugin>_<server>`.
 - `hooks.json` and `hooks/antigravity-guard.mjs`: see below.
 
-The files only Claude Code reads (`.claude-plugin/`, `.mcp.json`, `hooks/hooks.json`) stay out of the port.
+The files nothing reads there (`.mcp.json`, `hooks/hooks.json`) stay out of the port. `.claude-plugin/plugin.json` stays: a plugin's scripts may read their own name or version in it, and Antigravity ignores the folder.
 
 ### The guardrail hooks
 

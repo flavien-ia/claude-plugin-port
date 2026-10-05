@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-port",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "The engine behind claude-plugin-to-codex, claude-plugin-to-opencode and claude-plugin-to-antigravity: ports a Claude Code plugin to OpenAI Codex, OpenCode or Google Antigravity (manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks carried over, MCP servers, rules files, portable bundles with a self-contained installer). Library API plus a generic command.",
   "type": "module",
   "bin": {

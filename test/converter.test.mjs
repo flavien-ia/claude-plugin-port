@@ -547,9 +547,10 @@ test("antigravity: plugin folder with manifest, mcp, hooks.json, and an adapter 
   const hooks = JSON.parse(read(dir, "hooks.json"));
   assert.equal(hooks["demo-plugin-guard"].PreToolUse[0].matcher, "run_command");
   assert.equal(hooks["demo-plugin-guard"].PreToolUse[0].hooks[0].command, "node hooks/antigravity-guard.mjs");
-  for (const f of [".claude-plugin/plugin.json", ".mcp.json", "hooks/hooks.json", "hooks/opencode.permission.json"]) {
+  for (const f of [".mcp.json", "hooks/hooks.json", "hooks/opencode.permission.json"]) {
     assert.ok(!fs.existsSync(path.join(dir, ...f.split("/"))), `${f} stays out of the port`);
   }
+  assert.ok(fs.existsSync(path.join(dir, ".claude-plugin", "plugin.json")), "scripts may read their own manifest: it stays");
   assert.ok(fs.existsSync(path.join(dir, "hooks", "guard.mjs")), "the hook script itself ships");
   const skill = read(dir, "skills", "hello", "SKILL.md");
   assert.ok(skill.includes(`node "${fwd(dir)}/scripts/hello.mjs"`), "anchors become the absolute install path");

@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-to-codex",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Port a Claude Code plugin to OpenAI Codex, as a plugin: manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks run natively by Codex, MCP servers, rules file. Installs locally with `codex plugin add`, or builds a portable bundle that installs by unzipping. The Codex command of the claude-plugin-port engine.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "bin.mjs"
   ],
   "dependencies": {
-    "claude-plugin-port": "^0.5.0"
+    "claude-plugin-port": "^0.5.1"
   },
   "engines": {
     "node": ">=18"

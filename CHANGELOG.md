@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 - 2026-10-05
+
+- Antigravity: `.claude-plugin/plugin.json` stays in the port. A plugin's scripts may read their own name or version in it (license clients, update checks), and 0.5.0 left them without it. Only `.mcp.json`, `hooks/hooks.json` and `hooks/opencode.permission.json`, which nothing reads at run time, stay out.
+
 ## 0.5.0 - 2026-10-05
 
 - Google Antigravity, a third host: `--target antigravity` and a new command, `claude-plugin-to-antigravity`. The port is a native Antigravity plugin in `~/.gemini/config/plugins/<name>/`, read by the desktop app and the `agy` CLI: `plugin.json`, the converted skills, `mcp_config.json` (remote servers as `serverUrl`), and a `hooks.json` whose adapter runs the PreToolUse hooks with the payload Claude Code feeds them. A `deny` blocks, an `ask` opens Antigravity's permission dialog with the hook's reason, and no opinion prints nothing (Antigravity reads an empty `{}` as a refusal). Rules go to `AGENTS.md`, `AskUserQuestion` to the `ask_question` tool, `SKILL.antigravity.md` variants are picked up. Bundles unzip into `~/.gemini/config`; their installer updates the plugin folder in place with a copied backup, because a running Antigravity holds it open. Checked on a real machine: hooks in the app and in `agy` (a deny holds even under `--dangerously-skip-permissions`), PowerShell as the agent's shell on Windows, plugin rules and MCP servers loaded, 88 skills listed with full descriptions.

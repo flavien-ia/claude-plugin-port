@@ -30,7 +30,7 @@ A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`
 | the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" | "Antigravity" |
 | skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence | first sentence |
 
-The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills. `hooks/` is carried verbatim: Codex runs `hooks/hooks.json` natively; on OpenCode a generated plugin runs the same PreToolUse hook commands; on Antigravity a generated `hooks.json` and its adapter (`hooks/antigravity-guard.mjs`) do, and the files only Claude Code reads (`.claude-plugin/`, `.mcp.json`, `hooks/hooks.json`) stay out of the port.
+The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills. `hooks/` is carried verbatim: Codex runs `hooks/hooks.json` natively; on OpenCode a generated plugin runs the same PreToolUse hook commands; on Antigravity a generated `hooks.json` and its adapter (`hooks/antigravity-guard.mjs`) do, and the files nothing reads there (`.mcp.json`, `hooks/hooks.json`) stay out of the port; `.claude-plugin/plugin.json` stays, since a plugin's scripts may read their own version in it.
 
 ### Skill names
 
