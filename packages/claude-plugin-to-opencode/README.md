@@ -15,7 +15,7 @@ npx claude-plugin-to-opencode --source ./my-plugin --bundle ./out
 npx claude-plugin-to-opencode --source ./my-plugin --dry-run   # preview, writes nothing
 ```
 
-Idempotent: re-run it after each plugin update. Zero dependencies beyond its engine, Node 18+. For OpenAI Codex, use [`claude-plugin-to-codex`](https://www.npmjs.com/package/claude-plugin-to-codex).
+Idempotent: re-run it after each plugin update. Zero dependencies beyond its engine, Node 18+. For OpenAI Codex, use [`claude-plugin-to-codex`](https://www.npmjs.com/package/claude-plugin-to-codex); for Google Antigravity, [`claude-plugin-to-antigravity`](https://www.npmjs.com/package/claude-plugin-to-antigravity).
 
 ## What you get
 

@@ -1,6 +1,6 @@
 {
   "name": "claude-plugin-to-opencode",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Port a Claude Code plugin to OpenCode, as a plugin: skills with rewritten path anchors and host-valid names, a generated OpenCode plugin that runs the PreToolUse hooks and carries the MCP servers and permission rules, rules file. Installs under ~/.config/opencode, or builds a portable bundle that installs by unzipping. The OpenCode command of the claude-plugin-port engine.",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "bin.mjs"
   ],
   "dependencies": {
-    "claude-plugin-port": "^0.4.0"
+    "claude-plugin-port": "^0.5.0"
   },
   "engines": {
     "node": ">=18"

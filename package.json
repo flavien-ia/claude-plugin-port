@@ -1,7 +1,7 @@
 {
   "name": "claude-plugin-port",
-  "version": "0.4.0",
-  "description": "The engine behind claude-plugin-to-codex and claude-plugin-to-opencode: ports a Claude Code plugin to OpenAI Codex or to OpenCode (manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks carried over, MCP servers, rules files, portable bundles with a self-contained installer). Library API plus a generic command.",
+  "version": "0.5.0",
+  "description": "The engine behind claude-plugin-to-codex, claude-plugin-to-opencode and claude-plugin-to-antigravity: ports a Claude Code plugin to OpenAI Codex, OpenCode or Google Antigravity (manifest translation, skills with rewritten path anchors and host-valid names, PreToolUse hooks carried over, MCP servers, rules files, portable bundles with a self-contained installer). Library API plus a generic command.",
   "type": "module",
   "bin": {
     "claude-plugin-port": "bin/claude-plugin-port.mjs"
@@ -21,6 +21,8 @@
     "codex",
     "openai-codex",
     "opencode",
+    "antigravity",
+    "google-antigravity",
     "plugin",
     "skills",
     "agent-skills",
