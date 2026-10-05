@@ -9,6 +9,7 @@ import { convertFiles, describeSource, planSkillNames } from "../lib/convert.mjs
 import { buildBundle, INSTALLER_FILE } from "../lib/bundle.mjs";
 import { rewriteSkillNames } from "../lib/ports.mjs";
 import { checkCodexPlugin, frontmatterFields } from "../lib/targets/codex-check.mjs";
+import { checkAntigravityPlugin } from "../lib/antigravity.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, "..");
@@ -50,7 +51,7 @@ const withVersion = (files, version) =>
   files.map((f) => (f.path === ".claude-plugin/plugin.json" ? { ...f, content: JSON.stringify({ ...JSON.parse(f.content), version }) } : f));
 /** Runs the installer a bundle carries; never asks a real Codex to reinstall. */
 function install(target, from, home) {
-  const installer = path.join(from, target === "codex" ? "plugins" : "skills", "demo-plugin", INSTALLER_FILE);
+  const installer = path.join(from, target === "opencode" ? "skills" : "plugins", "demo-plugin", INSTALLER_FILE);
   try {
     return { code: 0, out: JSON.parse(execFileSync(process.execPath, [installer, "--from", from, "--home", home, "--no-refresh"], { encoding: "utf8" })) };
   } catch (e) {
@@ -110,7 +111,7 @@ test("codex: builds a validator-shaped plugin with hooks carried verbatim", () =
   const mk = JSON.parse(read(t, "mk.json"));
   assert.equal(mk.plugins[0].name, "demo-plugin");
   assert.equal(mk.plugins[0].source.path, "./plugins/demo-plugin");
-  assert.match(out, /1 skill name\(s\) changed to what both hosts accept \(_internal -> demo-plugin-internal\)/);
+  assert.match(out, /1 skill name\(s\) changed to what every host accepts \(_internal -> demo-plugin-internal\)/);
   assert.match(out, /No warnings\./);
 });
 
@@ -155,7 +156,7 @@ test("commands: claude-plugin-to-codex and claude-plugin-to-opencode bind their 
   // Each command imports the engine by its package name: a junction stands in
   // for the npm install during the test.
   const links = [];
-  for (const cmd of ["claude-plugin-to-codex", "claude-plugin-to-opencode"]) {
+  for (const cmd of ["claude-plugin-to-codex", "claude-plugin-to-opencode", "claude-plugin-to-antigravity"]) {
     const dir = path.join(ROOT, "packages", cmd, "node_modules");
     const link = path.join(dir, "claude-plugin-port");
     fs.mkdirSync(dir, { recursive: true });
@@ -185,8 +186,17 @@ test("commands: claude-plugin-to-codex and claude-plugin-to-opencode bind their 
     assert.ok(/^Codex:/m.test(help) && !/^OpenCode:/m.test(help), "the Codex command shows Codex flags only");
     const helpOc = runCmd("claude-plugin-to-opencode", ["--help"]).out;
     assert.ok(/^OpenCode:/m.test(helpOc) && !/^Codex:/m.test(helpOc), "the OpenCode command shows OpenCode flags only");
+    const ag = runCmd("claude-plugin-to-antigravity", ["--source", FIXTURE, "--dry-run"]);
+    assert.equal(ag.code, 0, ag.out);
+    assert.match(ag.out, /== target: antigravity ==/);
+    const agRefused = runCmd("claude-plugin-to-antigravity", ["--source", FIXTURE, "--target", "codex", "--dry-run"]);
+    assert.equal(agRefused.code, 1);
+    assert.match(agRefused.out, /ports to Antigravity only\. For Codex, use npx claude-plugin-to-codex/);
+    const helpAg = runCmd("claude-plugin-to-antigravity", ["--help"]).out;
+    assert.match(helpAg, /^claude-plugin-to-antigravity \d+\.\d+\.\d+ - port a Claude Code plugin to Antigravity\./m);
+    assert.ok(/^Antigravity:/m.test(helpAg) && !/^Codex:/m.test(helpAg) && !/^OpenCode:/m.test(helpAg), "the Antigravity command shows Antigravity flags only");
     const generic = run(["--help"]);
-    assert.match(generic, /^claude-plugin-port \d+\.\d+\.\d+ - port a Claude Code plugin to Codex or OpenCode\./m);
+    assert.match(generic, /^claude-plugin-port \d+\.\d+\.\d+ - port a Claude Code plugin to Codex, OpenCode or Antigravity\./m);
     const marker = JSON.parse(fs.readFileSync(path.join((() => { const t = tmp(); run(["--source", FIXTURE, "--target", "codex", "--bundle", path.join(t, "b")]); return t; })(), "b", "plugins", "demo-plugin", ".claude-plugin-to-codex.json"), "utf8"));
     assert.match(marker.generator, /^claude-plugin-port \d+\.\d+\.\d+$/, "the engine signs what it writes");
   } finally {
@@ -470,7 +480,14 @@ test("hypervibe (local only): both targets and both bundles build, and the guard
   await assert.rejects(call("git add -A && git commit -m x"), /^Error: \[Hypervibe\] Sweeping stage refused/, "the hook's own signature is kept, not doubled");
   await assert.rejects(call("git push --no-verify"), /pre-push hook/);
   await call("git add src/index.ts");
-  for (const target of ["codex", "opencode"]) {
+  const agDir = path.join(t, "ag");
+  const outAg = run(["--source", HYPERVIBE, "--target", "antigravity", "--plugins-dir", agDir]);
+  assert.ok(!/residual|check FAILED/.test(outAg), outAg);
+  assert.deepEqual(checkAntigravityPlugin(path.join(agDir, "hypervibe")), []);
+  const agGuard = guardRun(path.join(agDir, "hypervibe"), "git add -A && git commit -m x");
+  assert.equal(agGuard.decision, "deny");
+  assert.match(agGuard.reason, /^\[Hypervibe\] Sweeping stage refused/);
+  for (const target of ["codex", "opencode", "antigravity"]) {
     const out = run(["--source", HYPERVIBE, "--target", target, "--bundle", path.join(t, `bundle-${target}`)]);
     assert.ok(!/residual/.test(out), out);
   }
@@ -505,4 +522,97 @@ test("codex check: frontmatter fields, folded blocks and quotes", () => {
   assert.equal(frontmatterFields("---\nname: 'a b'\n---\n").fields.name, "a b");
   assert.match(frontmatterFields("no frontmatter").error, /must start/);
   assert.match(frontmatterFields("---\nname: a\n").error, /not closed/);
+});
+
+// ------------------------------------------------------------- antigravity
+
+/** Feeds the generated adapter what Antigravity feeds a PreToolUse hook. */
+function guardRun(pluginDir, command, tool = "run_command") {
+  const input = JSON.stringify({ toolCall: { name: tool, args: { CommandLine: command, Cwd: os.tmpdir() } }, conversationId: "c", workspacePaths: [os.tmpdir()] });
+  const out = execFileSync(process.execPath, ["hooks/antigravity-guard.mjs"], { cwd: pluginDir, input, encoding: "utf8" });
+  return out.trim() ? JSON.parse(out) : null;
+}
+
+test("antigravity: plugin folder with manifest, mcp, hooks.json, and an adapter that answers in Antigravity's terms", () => {
+  const t = tmp();
+  const out = run(["--source", FIXTURE, "--target", "antigravity", "--plugins-dir", t]);
+  const dir = path.join(t, "demo-plugin");
+  assert.match(out, /check: manifest, skills, hooks.json and mcp_config.json/);
+  assert.ok(!/no Antigravity tool for Monitor/.test(out), "a Claude-only tool is left out without a warning");
+  assert.deepEqual(checkAntigravityPlugin(dir), []);
+  const manifest = JSON.parse(read(dir, "plugin.json"));
+  assert.deepEqual(Object.keys(manifest), ["name", "displayName", "version", "description"]);
+  assert.equal(manifest.version, "1.2.3");
+  assert.deepEqual(JSON.parse(read(dir, "mcp_config.json")).mcpServers.context7, { serverUrl: "https://mcp.context7.com/mcp" });
+  const hooks = JSON.parse(read(dir, "hooks.json"));
+  assert.equal(hooks["demo-plugin-guard"].PreToolUse[0].matcher, "run_command");
+  assert.equal(hooks["demo-plugin-guard"].PreToolUse[0].hooks[0].command, "node hooks/antigravity-guard.mjs");
+  for (const f of [".claude-plugin/plugin.json", ".mcp.json", "hooks/hooks.json", "hooks/opencode.permission.json"]) {
+    assert.ok(!fs.existsSync(path.join(dir, ...f.split("/"))), `${f} stays out of the port`);
+  }
+  assert.ok(fs.existsSync(path.join(dir, "hooks", "guard.mjs")), "the hook script itself ships");
+  const skill = read(dir, "skills", "hello", "SKILL.md");
+  assert.ok(skill.includes(`node "${fwd(dir)}/scripts/hello.mjs"`), "anchors become the absolute install path");
+  assert.ok(!skill.includes("CLAUDE.md"), "Antigravity reads AGENTS.md");
+
+  const deny = guardRun(dir, "rm -rf /");
+  assert.equal(deny.decision, "deny");
+  assert.match(deny.reason, /Refused: rm -rf \/ \(root=set\)/, "the hook sees CLAUDE_PLUGIN_ROOT");
+  assert.match(deny.reason, /^\[demo-plugin\] /, "an unsigned reason gets the plugin's name");
+  assert.deepEqual(guardRun(dir, "git push origin main"), { decision: "ask", reason: "[demo-plugin] A push publishes." });
+  assert.equal(guardRun(dir, "echo hello"), null, "no opinion = no output at all (Antigravity reads {} as a refusal)");
+  assert.equal(guardRun(dir, "rm -rf /", "view_file"), null, "other tools are not the Bash hook's business");
+
+  // a second run updates in place: a file gone from the source disappears, the folder stays
+  fs.writeFileSync(path.join(dir, "stale.txt"), "old");
+  const again = run(["--source", FIXTURE, "--target", "antigravity", "--plugins-dir", t]);
+  assert.match(again, /1 file\(s\) of the previous version removed/);
+  assert.ok(!fs.existsSync(path.join(dir, "stale.txt")));
+});
+
+test("antigravity: bundle unzips into ~/.gemini/config, and its installer updates in place with a copied backup", () => {
+  const files = fixtureFiles();
+  const bundle = buildBundle(files, { target: "antigravity", generator: "test", defaultPrompt: ["Say hello", "", "Two", "Three", "Four"] });
+  assert.equal(bundle.unzipInto, "$HOME/.gemini/config");
+  const paths = bundle.files.map((f) => f.path);
+  for (const p of ["plugins/demo-plugin/plugin.json", "plugins/demo-plugin/hooks.json", "plugins/demo-plugin/hooks/antigravity-guard.mjs", "plugins/demo-plugin/mcp_config.json", `plugins/demo-plugin/${INSTALLER_FILE}`]) {
+    assert.ok(paths.includes(p), p);
+  }
+  assert.ok(!paths.includes("plugins/demo-plugin/.mcp.json"));
+  assert.deepEqual(JSON.parse(bundle.files.find((f) => f.path === "plugins/demo-plugin/plugin.json").content).suggestedPrompts, ["Say hello", "Two", "Three"]);
+  const skill = bundle.files.find((f) => f.path === "plugins/demo-plugin/skills/hello/SKILL.md").content;
+  assert.ok(skill.includes('node "$HOME/.gemini/config/plugins/demo-plugin/scripts/hello.mjs"'), "$HOME anchors: PowerShell and POSIX shells both expand them");
+  assert.equal(bundle.warnings.length, 0, bundle.warnings.join("\n"));
+
+  const home = tmp();
+  const pluginDir = path.join(home, ".gemini", "config", "plugins", "demo-plugin");
+  const first = install("antigravity", unpack(bundle, tmp()), home);
+  assert.equal(first.code, 0, JSON.stringify(first.out));
+  assert.match(first.out.next, /Quit Antigravity/);
+  assert.ok(fs.existsSync(path.join(pluginDir, "plugin.json")));
+  const before = fs.statSync(pluginDir).ino;
+  fs.writeFileSync(path.join(pluginDir, "stale.txt"), "old");
+
+  const second = install("antigravity", unpack(buildBundle(withVersion(files, "1.3.0"), { target: "antigravity", generator: "test" }), tmp()), home);
+  assert.equal(second.code, 0, JSON.stringify(second.out));
+  assert.equal(second.out.previousVersion, "1.2.3");
+  assert.equal(fs.statSync(pluginDir).ino, before, "the folder is updated in place, never moved (a running Antigravity holds it open)");
+  assert.ok(!fs.existsSync(path.join(pluginDir, "stale.txt")), "files gone from the new version are removed");
+  assert.ok(fs.existsSync(path.join(second.out.backup, "stale.txt")), "the backup is a full copy of the previous folder");
+  assert.ok(!path.resolve(second.out.backup).startsWith(path.join(home, ".gemini")), "Antigravity never loads the backup");
+  assert.equal(JSON.parse(read(pluginDir, ".claude-plugin-to-codex.json")).sourceVersion, "1.3.0");
+
+  const broken = unpack(buildBundle(withVersion(files, "1.4.0"), { target: "antigravity", generator: "test" }), tmp());
+  fs.rmSync(path.join(broken, "plugins", "demo-plugin", "plugin.json"));
+  const refused = install("antigravity", broken, home);
+  assert.equal(refused.code, 1);
+  assert.match(refused.out.error, /plugin\.json/);
+  assert.equal(JSON.parse(read(pluginDir, ".claude-plugin-to-codex.json")).sourceVersion, "1.3.0", "the installed version is untouched");
+});
+
+test("commands: claude-plugin-to-antigravity is a target like the others", () => {
+  const help = run(["--help"]);
+  assert.match(help, /claude-plugin-to-antigravity --source/);
+  assert.match(help, /--target <t>\s+codex \| opencode \| antigravity/);
+  assert.throws(() => run(["--source", FIXTURE, "--target", "nope"]), /--target must be codex, opencode, antigravity/);
 });

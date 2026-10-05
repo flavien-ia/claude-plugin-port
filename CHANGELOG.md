@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Google Antigravity, a third host: `--target antigravity` and a new command, `claude-plugin-to-antigravity`. The port is a native Antigravity plugin in `~/.gemini/config/plugins/<name>/`, read by the desktop app and the `agy` CLI: `plugin.json`, the converted skills, `mcp_config.json` (remote servers as `serverUrl`), and a `hooks.json` whose adapter runs the PreToolUse hooks with the payload Claude Code feeds them. A `deny` blocks, an `ask` opens Antigravity's permission dialog with the hook's reason, and no opinion prints nothing (Antigravity reads an empty `{}` as a refusal). Rules go to `AGENTS.md`, `AskUserQuestion` to the `ask_question` tool, `SKILL.antigravity.md` variants are picked up. Bundles unzip into `~/.gemini/config`; their installer updates the plugin folder in place with a copied backup, because a running Antigravity holds it open. Checked on a real machine: hooks in the app and in `agy` (a deny holds even under `--dangerously-skip-permissions`), PowerShell as the agent's shell on Windows, plugin rules and MCP servers loaded, 88 skills listed with full descriptions.
 - Codex check built in: Codex 0.159 stopped shipping the `plugin-creator` skill and its `validate_plugin.py`, so on an up-to-date Codex the validation was silently skipped. The converter now checks the built plugin itself (manifest keys, strict semver, the `interface` block, each skill's frontmatter), and still runs Codex's validator when an older Codex has it, in UTF-8 on Windows.
 - Test: the real-plugin test follows the guard's current wording.
 

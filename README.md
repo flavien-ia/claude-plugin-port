@@ -5,35 +5,36 @@ The engine that ports a [Claude Code](https://docs.anthropic.com/en/docs/claude-
 ```bash
 npx claude-plugin-to-codex --source ./my-plugin       # OpenAI Codex
 npx claude-plugin-to-opencode --source ./my-plugin    # OpenCode
+npx claude-plugin-to-antigravity --source ./my-plugin # Google Antigravity
 ```
 
-Each command speaks its host only: its help, its flags, its README ([Codex](packages/claude-plugin-to-codex/README.md), [OpenCode](packages/claude-plugin-to-opencode/README.md)). This package is what they share: the conversion, the bundles, the installer, the library API, and a generic command for scripts that serve both hosts:
+Each command speaks its host only: its help, its flags, its README ([Codex](packages/claude-plugin-to-codex/README.md), [OpenCode](packages/claude-plugin-to-opencode/README.md), [Antigravity](packages/claude-plugin-to-antigravity/README.md)). This package is what they share: the conversion, the bundles, the installer, the library API, and a generic command for scripts that serve every host:
 
 ```bash
-npx claude-plugin-port --source ./my-plugin --target codex|opencode [--bundle <dir>] [--dry-run]
+npx claude-plugin-port --source ./my-plugin --target codex|opencode|antigravity [--bundle <dir>] [--dry-run]
 ```
 
-A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`, and often `scripts/`, `templates/`, `hooks/` and `.mcp.json`. Codex and OpenCode both read the same `SKILL.md` format, but neither knows Claude Code's path anchors, its rules file, its tool names or its hook wiring. The engine rewrites exactly those, and nothing else. Idempotent, zero dependencies, Node 18+.
+A Claude Code plugin is a directory with `.claude-plugin/plugin.json`, `skills/`, and often `scripts/`, `templates/`, `hooks/` and `.mcp.json`. Codex, OpenCode and Antigravity all read the same `SKILL.md` format, but none knows Claude Code's path anchors, its rules file, its tool names or its hook wiring. The engine rewrites exactly those, and nothing else. Idempotent, zero dependencies, Node 18+.
 
 ## What gets rewritten
 
-| In the plugin | Why | Codex | OpenCode |
-|---|---|---|---|
-| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts, braced or bare (`$CLAUDE_SKILL_DIR`) | both hosts run skill commands with `cwd` = the user's project and no plugin variable | install path | install path |
-| a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | install path | install path |
-| `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see the OpenCode README) |
-| frontmatter keys other than `name`, `description`, `license`, `metadata` (`user-invocable`, `allowed-tools`, `argument-hint`, `compatibility`...) | Codex's skill validator accepts only those, and `compatibility` describes Claude Code | dropped | dropped |
-| skill names outside lowercase letters, digits and single hyphens (typically `_helper`) | the naming rule of both hosts | renamed, every mention rewritten | renamed, every mention rewritten |
-| unquoted frontmatter scalars with `: ` etc. | strict YAML parsers | quoted | quoted |
-| `AskUserQuestion` | a Claude Code tool | "a direct question to the user" | "the `question` tool" |
-| the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" |
-| skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence |
+| In the plugin | Why | Codex | OpenCode | Antigravity |
+|---|---|---|---|---|
+| `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` in skills and scripts, braced or bare (`$CLAUDE_SKILL_DIR`) | every host runs skill commands with `cwd` = the user's project and no plugin variable | install path | install path | install path |
+| a hand-typed `~/.claude/plugins/marketplaces/<x>/<name>` | same anchor, fragile form; reported as a warning | install path | install path | install path |
+| `CLAUDE.md` in skills and scripts, `~/.claude/CLAUDE.md` and `path.join(homedir, ".claude", "CLAUDE.md")` | the host's rules file | `AGENTS.md`, `~/.codex/AGENTS.md` | `AGENTS.md`, `~/.config/opencode/AGENTS.md`, or kept as `CLAUDE.md` (see the OpenCode README) | `AGENTS.md`, `~/.gemini/AGENTS.md` |
+| frontmatter keys other than `name`, `description`, `license`, `metadata` (`user-invocable`, `allowed-tools`, `argument-hint`, `compatibility`...) | Codex's skill validator accepts only those, and `compatibility` describes Claude Code | dropped | dropped | dropped |
+| skill names outside lowercase letters, digits and single hyphens (typically `_helper`) | the naming rule of every host | renamed, every mention rewritten | renamed, every mention rewritten | renamed, every mention rewritten |
+| unquoted frontmatter scalars with `: ` etc. | strict YAML parsers | quoted | quoted | quoted |
+| `AskUserQuestion` | a Claude Code tool | "a direct question to the user" | "the `question` tool" | "the `ask_question` tool" |
+| the words "Claude Code" in skill texts | the model should not be told it runs somewhere else (`--no-rebrand` to keep) | "Codex" | "OpenCode" | "Antigravity" |
+| skill descriptions (`--short-descriptions`) | Codex budgets its skill catalog to 2% of the context and shortens past that | first sentence | first sentence | first sentence |
 
-The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills. `hooks/` is carried verbatim: Codex runs `hooks/hooks.json` natively; on OpenCode a generated plugin runs the same PreToolUse hook commands.
+The install path is absolute for a local install and `$HOME/<path>` in a bundle (bash and PowerShell both expand it inside double quotes). `templates/` is project payload and stays byte for byte, apart from the names of renamed skills. `hooks/` is carried verbatim: Codex runs `hooks/hooks.json` natively; on OpenCode a generated plugin runs the same PreToolUse hook commands; on Antigravity a generated `hooks.json` and its adapter (`hooks/antigravity-guard.mjs`) do, and the files only Claude Code reads (`.claude-plugin/`, `.mcp.json`, `hooks/hooks.json`) stay out of the port.
 
 ### Skill names
 
-Codex's skill validator and OpenCode's documentation both ask for names made of lowercase letters, digits and single hyphens. A leading `_`, the usual mark of an internal helper in a Claude Code plugin, becomes the internal prefix, `<plugin name>-` by default: `_helper` becomes `my-plugin-helper`. The folder, the `name:` line and every mention of the skill follow (paths, `plugin:skill` references, `/commands`, templates, scripts), matched as whole names only, so `_helper` is never rewritten inside `_helper-extra`. A rename that would collide with another skill stops the conversion.
+Codex's skill validator and the documentation of OpenCode and Antigravity all ask for names made of lowercase letters, digits and single hyphens. A leading `_`, the usual mark of an internal helper in a Claude Code plugin, becomes the internal prefix, `<plugin name>-` by default: `_helper` becomes `my-plugin-helper`. The folder, the `name:` line and every mention of the skill follow (paths, `plugin:skill` references, `/commands`, templates, scripts), matched as whole names only, so `_helper` is never rewritten inside `_helper-extra`. A rename that would collide with another skill stops the conversion.
 
 `--internal-prefix hv` gives `hv-helper`. `--keep-skill-names` keeps the names as they are: both loaders accept them today, only the validators refuse them.
 
@@ -56,7 +57,7 @@ Command-line flags win over the file: `--internal-prefix`, `--keep-skill-names`,
 
 ### A text per host
 
-When a skill works differently on one host, give it a variant next to its `SKILL.md`: `SKILL.codex.md` replaces `SKILL.md` in the Codex port, `SKILL.opencode.md` in the OpenCode port. Any `<file>.codex.md` or `<file>.opencode.md` inside a skill folder works the same way. The variant goes through the same rewrites, and no variant file ships in any port. Claude Code reads `SKILL.md` only.
+When a skill works differently on one host, give it a variant next to its `SKILL.md`: `SKILL.codex.md` replaces `SKILL.md` in the Codex port, `SKILL.opencode.md` in the OpenCode port, `SKILL.antigravity.md` in the Antigravity port. Any `<file>.<host>.md` inside a skill folder works the same way. The variant goes through the same rewrites, and no variant file ships in any port. Claude Code reads `SKILL.md` only.
 
 ## Bundles
 
@@ -66,6 +67,7 @@ When a skill works differently on one host, give it a variant next to its `SKILL
 |---|---|---|
 | codex | the home folder | `plugins/<name>/` (the plugin) and `.agents/plugins/marketplace.json` (a personal marketplace listing it; keep yours and add the entry if you already have one). Then install it from Codex's plugin browser, or `codex plugin add <name>@personal`. |
 | opencode | `~/.config/opencode` | `skills/<name>/` (the plugin) and `plugins/<name>-guard.js` (hooks, MCP servers and permission rules, root resolved from the home folder when it loads). Start a new session. |
+| antigravity | `~/.gemini/config` | `plugins/<name>/` (the plugin, with `plugin.json`, `hooks.json` and `mcp_config.json`). Quit Antigravity and open it again: it discovers a new plugin folder only at startup. |
 
 Bundles use `AGENTS.md` and `--ask-mode pass` when a permission fragment exists.
 
@@ -76,9 +78,10 @@ Every bundle carries a standalone installer at the root of its plugin folder, `.
 ```bash
 node <unpacked>/plugins/<name>/.claude-plugin-to-codex.install.mjs --from <unpacked>    # Codex
 node <unpacked>/skills/<name>/.claude-plugin-to-codex.install.mjs --from <unpacked>     # OpenCode
+node <unpacked>/plugins/<name>/.claude-plugin-to-codex.install.mjs --from <unpacked>    # Antigravity
 ```
 
-It moves the installed copy to `~/.claude-plugin-to-codex/backups/` (outside the folders the host scans, so the old skills are never loaded twice; the last three are kept), puts the new copy in its place, and brings the old one back if any step fails. On Codex it keeps the plugin's entry in `~/.agents/plugins/marketplace.json` without touching the other entries, then runs `codex plugin add <name>@<marketplace>` so Codex's cache follows (`--no-refresh` to skip). On OpenCode it replaces the generated plugin along with the skills. It prints one JSON line; start a new thread or session afterwards. A plugin's own update command can do the same: download the bundle, unpack it, run the installer.
+It moves the installed copy to `~/.claude-plugin-to-codex/backups/` (outside the folders the host scans, so the old skills are never loaded twice; the last three are kept), puts the new copy in its place, and brings the old one back if any step fails. On Codex it keeps the plugin's entry in `~/.agents/plugins/marketplace.json` without touching the other entries, then runs `codex plugin add <name>@<marketplace>` so Codex's cache follows (`--no-refresh` to skip). On OpenCode it replaces the generated plugin along with the skills. On Antigravity, which holds a running plugin's folder open (Windows then refuses to move it), it copies the installed version to the backup and updates the folder in place instead, copying the backup back if a step fails. It prints one JSON line; start a new thread or session afterwards (restart Antigravity). A plugin's own update command can do the same: download the bundle, unpack it, run the installer.
 
 The marker each port carries (`.claude-plugin-to-codex.json`, with `target`, `sourceVersion` and `generator`), the installer's file name and the backups folder keep the engine's historical name: installed ports and update flows rely on them.
 
@@ -93,15 +96,16 @@ const { files, warnings, renamedSkills, excludedSkills } = buildBundle(files, { 
 // zip `files` yourself (JSZip, archiver...). Binary contents pass through untouched.
 ```
 
-No disk, no environment lookups: a web server can convert an archive on download. `ports.json` is read from the files; the options `internalPrefix`, `keepSkillNames`, `excludeSkills` and `ports` (an object, or `null` to ignore the file) do what the flags do. `claude-plugin-port/cli` exposes `main(argv, { host, program })`, which the two commands call with their host set.
+No disk, no environment lookups: a web server can convert an archive on download. `ports.json` is read from the files; the options `internalPrefix`, `keepSkillNames`, `excludeSkills` and `ports` (an object, or `null` to ignore the file) do what the flags do. `claude-plugin-port/cli` exposes `main(argv, { host, program })`, which the three commands call with their host set.
 
 ## Limitations
 
 - Skills that spell out Claude Code specifics beyond what is rewritten (settings files, slash-command menus) keep saying them; read the port once, and write a host variant where the difference matters.
 - A skill name assembled at run time (`"_" + name`) is not seen by the rename.
-- Hooks other than PreToolUse are carried to Codex (which runs them) but not to OpenCode.
+- Hooks other than PreToolUse are carried to Codex (which runs them) but not to OpenCode or Antigravity.
+- On Antigravity, a PreToolUse hook is ported for the tools that have a counterpart (`Bash`, `Read`, `Write`); Claude-only tools such as `Monitor` are left out.
 - OpenCode's permission patterns are wildcards on the parsed command, less precise than a hook's regexes: the fragment mirrors, the hook decides.
-- Both hosts move fast. Tested with Codex CLI 0.154 and OpenCode 1.18.30.
+- The hosts move fast. Tested with Codex CLI 0.160, OpenCode 1.18.34, and Antigravity (desktop app and `agy` CLI 1.2.17, hooks, permissions dialog and plugin MCP checked on a real machine).
 
 ## Development
 
@@ -109,7 +113,7 @@ No disk, no environment lookups: a web server can convert an archive on download
 node --test test/converter.test.mjs
 ```
 
-The repository holds the engine at its root and the two commands under `packages/`; each command is a few lines that call the engine with its host set. Releases publish the three packages together, the commands pinned to the engine's minor version.
+The repository holds the engine at its root and the three commands under `packages/`; each command is a few lines that call the engine with its host set. Releases publish the three packages together, the commands pinned to the engine's minor version.
 
 ## License
 

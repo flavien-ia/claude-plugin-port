@@ -1,4 +1,4 @@
-export type Target = "codex" | "opencode";
+export type Target = "codex" | "opencode" | "antigravity";
 
 export interface PluginFile {
   /** Plugin-root-relative path with forward slashes. */

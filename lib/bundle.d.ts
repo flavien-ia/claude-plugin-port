@@ -29,7 +29,7 @@ export interface BundleResult {
   warnings: string[];
   name: string;
   version: string;
-  /** Where the bundle expects to be unzipped ("$HOME" or "$HOME/.config/opencode"). */
+  /** Where the bundle expects to be unzipped ("$HOME", "$HOME/.config/opencode" or "$HOME/.gemini/config"). */
   unzipInto: string;
   skillCount: number;
   /** Old skill name -> new name, for the names that had to change. */
